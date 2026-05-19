@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIMO Directional Gain 智慧計算器 (FCC KDB 662911 / NCC 符合性分析)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#ecfeff',
+                            100: '#cffafe',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            700: '#0e7490',
+                            900: '#164e63',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- MathJax 核心配置與主程式載入 (解決 LaTeX 亂碼關鍵) -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: {
+                ignoreHtmlClass: 'tex2jax_ignore',
+                processHtmlClass: 'tex2jax_process'
+            },
+            startup: {
+                pageReady: () => {
+                    return MathJax.startup.defaultPageReady();
+                }
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        /* 自訂滾動條 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #06b6d4;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans selection:bg-cyan-500 selection:text-slate-900">
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        
+        <!-- 頂部導航欄與系統標題 -->
+        <header class="mb-8 border-b border-slate-800 pb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <!-- 智慧標籤區 -->
+                <div class="flex flex-wrap items-center gap-2 mb-3">
+                    <span class="bg-cyan-500/10 text-cyan-400 text-xs font-semibold px-2.5 py-1 rounded-full border border-cyan-500/20">
+                        FCC KDB 662911 D01 100% 合規工具
+                    </span>
+                    <span class="bg-emerald-500/10 text-emerald-400 text-xs font-semibold px-2.5 py-1 rounded-full border border-emerald-500/20">
+                        NCC 射頻規範完整對齊
+                    </span>
+                    <span class="bg-slate-900 text-slate-300 text-xs font-semibold px-2.5 py-1 rounded-full border border-slate-800 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                        Version: V1.0
+                    </span>
+                    <span class="bg-slate-900 text-slate-300 text-xs font-semibold px-2.5 py-1 rounded-full border border-slate-800 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        Author: Sam Chen
+                    </span>
+                </div>
+                <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+                    MIMO Directional Gain 智慧計算器
+                </h1>
+                <p class="text-slate-400 text-sm mt-1">
+                    適用於天線增益不等 (Unequal Antenna Gains) 的 CDD / MIMO / 交叉極化分組與 Wi-Fi CDD 功率豁免分析
+                </p>
+            </div>
+            
+            <!-- 快速預設檔載入 -->
+            <div class="flex flex-wrap items-center gap-2 bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                <span class="text-xs font-medium text-slate-400 px-2">載入 KDB 範例配置：</span>
+                <button onclick="loadPreset('wifi6e_2x2')" class="text-xs bg-slate-800 hover:bg-slate-700 text-cyan-400 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                    WiFi 6E 2x2 CDD
+                </button>
+                <button onclick="loadPreset('wifi7_4x4')" class="text-xs bg-slate-800 hover:bg-slate-700 text-cyan-400 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                    WiFi 7 4x4 (複雜權重)
+                </button>
+                <button onclick="loadPreset('cross_pol_2x2')" class="text-xs bg-slate-800 hover:bg-slate-700 text-emerald-400 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                    交叉極化 2x2 (免陣列增益)
+                </button>
+            </div>
+        </header>
+
+        <!-- 主要佈局：左側控制面板，右側即時計算與合規評估 -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- 左側/中左側：參數輸入區與信號路由矩陣 (佔 7 格) -->
+            <main class="lg:col-span-7 space-y-8">
+                
+                <!-- 1. 基本 MIMO 參數設定 -->
+                <section class="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800 p-6 shadow-xl">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                        </div>
+                        <h2 class="text-lg font-bold text-white">MIMO 架構基礎配置</h2>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- 天線數 (N_ANT) -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2 flex justify-between">
+                                <span>天線總數 ($N_{ANT}$)</span>
+                                <span id="nAnt_val" class="text-cyan-400 font-bold">4</span>
+                            </label>
+                            <input id="nAnt" type="range" min="2" max="8" value="4" oninput="updateAntennaCount(this.value)" class="w-full accent-cyan-500 h-2 bg-slate-800 rounded-lg cursor-pointer">
+                            <div class="flex justify-between text-xs text-slate-500 mt-1">
+                                <span>2</span>
+                                <span>4</span>
+                                <span>6</span>
+                                <span>8 (Max)</span>
+                            </div>
+                        </div>
+
+                        <!-- 空間流數 (N_SS) -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2 flex justify-between">
+                                <span>空間流總數 ($N_{SS}$)</span>
+                                <span id="nSs_val" class="text-cyan-400 font-bold">2</span>
+                            </label>
+                            <input id="nSs" type="range" min="1" max="8" value="2" oninput="updateSpatialStreamCount(this.value)" class="w-full accent-cyan-500 h-2 bg-slate-800 rounded-lg cursor-pointer">
+                            <div class="flex justify-between text-xs text-slate-500 mt-1">
+                                <span>1</span>
+                                <span>4</span>
+                                <span>6</span>
+                                <span>8 (Max)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MIMO 智慧合規連動說明 -->
+                    <div class="mt-4 p-3 bg-cyan-500/5 rounded-xl border border-cyan-500/10 text-xs text-cyan-400/90 leading-relaxed flex gap-2">
+                        <span class="flex-shrink-0">⚙️</span>
+                        <p>
+                            <b>智慧合規連動：</b>依據 KDB 標準，空間流數 ($N_{SS}$) 不得大於天線數 ($N_{ANT}$)。調整空間流大於天線數時，系統將自動同步擴充天線架構。
+                        </p>
+                    </div>
+
+                    <!-- 公式情境選擇 -->
+                    <div class="mt-6 border-t border-slate-800/80 pt-6">
+                        <label class="block text-sm font-medium text-slate-300 mb-3">法規公式與天線驅動情境選擇 (Section F)2)e))</label>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- 情境 ii -->
+                            <label class="relative flex flex-col p-4 bg-slate-950 rounded-xl border-2 border-slate-800 cursor-pointer hover:border-slate-700 transition" id="label_scenario_ii">
+                                <input type="radio" name="scenario" value="ii" checked onchange="switchScenario('ii')" class="sr-only">
+                                <span class="font-bold text-white text-sm flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block" id="dot_scenario_ii"></span>
+                                    情境 (ii)：單流驅動單天線
+                                </span>
+                                <span class="text-slate-400 text-xs mt-2 leading-relaxed">
+                                    每根發射天線僅由 <b>1 個</b> 獨立空間流驅動。天線增益不等，適用 KDB 分流嚴謹算式。
+                                </span>
+                            </label>
+
+                            <!-- 情境 iii -->
+                            <label class="relative flex flex-col p-4 bg-slate-950 rounded-xl border-2 border-slate-800 cursor-pointer hover:border-slate-700 transition" id="label_scenario_iii">
+                                <input type="radio" name="scenario" value="iii" onchange="switchScenario('iii')" class="sr-only">
+                                <span class="font-bold text-slate-300 text-sm flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-slate-700 inline-block" id="dot_scenario_iii"></span>
+                                    情境 (iii)：多流共享驅動天線
+                                </span>
+                                <span class="text-slate-400 text-xs mt-2 leading-relaxed">
+                                    天線可由 <b>多個</b> 空間流同時驅動。支援各路徑相對歸一化功率分配 $P_{j,k}$ 加權計算。
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 1.5. KDB 662911 射頻極化與 CDD 豁免設定 -->
+                <section class="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800 p-6 shadow-xl space-y-6">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                        </div>
+                        <h2 class="text-lg font-bold text-white">天線架構極化與 CDD 豁免設定</h2>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- 天線極化選擇 (Section F)2)c)) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">天線極化配置</label>
+                            <select id="polarization" onchange="updateTechConfig()" class="w-full bg-slate-950 text-slate-200 border border-slate-800 rounded-lg p-2.5 text-xs focus:ring-1 focus:ring-cyan-500">
+                                <option value="co">共極化 (Co-Polarized - 傳統天線陣列)</option>
+                                <option value="cross">交叉極化 (Cross-Polarized - H/V 正交)</option>
+                            </select>
+                        </div>
+
+                        <!-- 技術與相關性模式選擇 (Section F)2)d)) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">訊號相關性與技術模式</label>
+                            <select id="tech_mode" onchange="updateTechConfig()" class="w-full bg-slate-950 text-slate-200 border border-slate-800 rounded-lg p-2.5 text-xs focus:ring-1 focus:ring-cyan-500">
+                                <option value="correlated">相干疊加 (Correlated / Beamforming)</option>
+                                <option value="uncorrelated">完全不相關 (Uncorrelated / STBC)</option>
+                                <option value="cdd">Wi-Fi CDD 模式 (Cyclic Delay Diversity)</option>
+                            </select>
+                        </div>
+
+                        <!-- Wi-Fi CDD 量測標的與頻寬選擇 (Section F)2)f)) (更新 5log N_ANT >= 5 標註) -->
+                        <div id="cdd_config_wrapper" class="hidden">
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">CDD 頻道與量測指標類型</label>
+                            <select id="cdd_sub_mode" onchange="triggerCalculation()" class="w-full bg-slate-950 text-slate-200 border border-slate-800 rounded-lg p-2.5 text-xs focus:ring-1 focus:ring-cyan-500">
+                                <option value="psd">所有設備的 PSD 量測 (Array Gain 疊加)</option>
+                                <option value="power_40m">802.11 功率量測 (寬頻寬 ≥ 40 MHz) [豁免 0dB]</option>
+                                <option value="power_20m">802.11 功率量測 (窄頻寬 20 MHz) [5log 豁免, N_ANT ≥ 5]</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. 天線增益設定 (G_k) -->
+                <section class="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800 p-6 shadow-xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            </div>
+                            <h2 class="text-lg font-bold text-white">個別天線 Gain 設定 ($G_k$)</h2>
+                        </div>
+                        <button onclick="setAllGainsEqual()" class="text-xs text-cyan-400 hover:text-cyan-300 underline underline-offset-4">
+                            一鍵將天線 Gain 設為相同
+                        </button>
+                    </div>
+
+                    <!-- 動態產生的天線輸入欄位 -->
+                    <div id="antenna_gains_container" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <!-- Dynamic Content -->
+                    </div>
+                </section>
+
+                <!-- 3. 動態訊號路由矩陣與權重設定 -->
+                <section class="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800 p-6 shadow-xl">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+                            </div>
+                            <div>
+                                <h2 class="text-lg font-bold text-white">射頻訊號映射矩陣 (Mapping Matrix)</h2>
+                                <p class="text-xs text-slate-400 mt-0.5" id="matrix_desc">設定空間流 $j$ 到天線 $k$ 的物理連結與分配</p>
+                            </div>
+                        </div>
+
+                        <!-- 輔助按鈕 (僅情境 iii 有效) -->
+                        <div id="power_helper_buttons" class="hidden flex gap-2">
+                            <button onclick="autoNormalizePower()" class="text-xs bg-slate-800 hover:bg-slate-700 text-cyan-400 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                                自動等功率歸一化
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 矩陣主表格 -->
+                    <div class="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950/80">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 bg-slate-900/50 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                    <th class="p-4 w-32">空間流 (Spatial Stream)</th>
+                                    <!-- 動態天線標題 -->
+                                    <th colspan="8" class="p-4 text-center">驅動天線分佈 (Antennas)</th>
+                                </tr>
+                                <tr id="matrix_header_antennas" class="border-b border-slate-800 text-center text-xs font-medium text-slate-500 bg-slate-950">
+                                    <th class="p-2 border-r border-slate-850"></th>
+                                    <!-- 動態產生個別天線名稱 -->
+                                </tr>
+                            </thead>
+                            <tbody id="routing_matrix_body" class="divide-y divide-slate-800/60 text-sm">
+                                <!-- 動態填充路由列 -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 歸一化功率指示器 (僅情境 iii 顯示) -->
+                    <div id="normalization_indicator" class="hidden mt-4 p-4 bg-slate-950 rounded-xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-400">當前相對功率總和 $\sum P_{j,k}$ :</span>
+                            <span id="power_sum_display" class="font-bold text-cyan-400 text-sm">4.00</span>
+                            <span class="text-slate-500">/ 目標天線數 $N_{ANT}$ :</span>
+                            <span id="target_sum_display" class="font-bold text-emerald-400 text-sm">4.00</span>
+                        </div>
+                        <div id="normalization_status" class="flex items-center gap-1.5 text-emerald-400">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> 功率已精準歸一化符合法規要求
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. 動態 SVG 射頻拓撲圖 -->
+                <section class="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800 p-6 shadow-xl overflow-hidden">
+                    <h3 class="text-sm font-semibold text-slate-400 mb-4 flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-cyan-500"></span> 射頻信號路由流向示意圖
+                    </h3>
+                    <div class="bg-slate-950/85 p-4 rounded-xl border border-slate-850 flex justify-center items-center">
+                        <svg id="routing_svg" class="w-full max-w-lg h-48" viewBox="0 0 500 200">
+                            <!-- SVG 動態線條與節點 -->
+                        </svg>
+                    </div>
+                </section>
+
+            </main>
+
+            <!-- 右側：計算結果面板、認證合規檢查 (佔 5 格) -->
+            <aside class="lg:col-span-5 space-y-8">
+                
+                <!-- 1. 定向增益計算結果 -->
+                <section class="bg-gradient-to-b from-slate-900 to-slate-950 rounded-2xl border border-slate-800 p-6 shadow-2xl relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+                    
+                    <h2 class="text-lg font-bold text-white mb-6 flex items-center gap-3">
+                        <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2"></path></svg>
+                        </div>
+                        定向增益 (Directional Gain) 計算結果
+                    </h2>
+
+                    <div class="space-y-6">
+                        <!-- 方法 1: 最差狀況包絡法 -->
+                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-850 hover:border-slate-800 transition">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-semibold text-slate-400">方法 1 : 等效天線最差極限包絡值</span>
+                                <span class="bg-slate-800 text-[10px] text-slate-400 px-2 py-0.5 rounded-md">適用包絡測試</span>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span id="method1_result" class="text-3xl font-extrabold text-white">--</span>
+                                <span class="text-sm font-semibold text-slate-400">dBi</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-2" id="method1_formula_desc">
+                                公式: $G_{ANT\ MAX} + 10 \log_{10}(N_{ANT}/N_{SS})$
+                            </p>
+                        </div>
+
+                        <!-- 方法 2: 嚴謹同相/關聯疊加疊加法 (KDB 662911 精準公式) -->
+                        <div class="bg-slate-950 p-5 rounded-xl border-2 border-cyan-500/30 hover:border-cyan-500/50 transition shadow-lg shadow-cyan-950/20 relative font-sans">
+                            <div class="absolute -top-3 left-4 bg-cyan-500 text-slate-950 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                精確演算法 (嚴謹實測推薦)
+                            </div>
+                            <div class="flex justify-between items-center mb-2 mt-1">
+                                <span class="text-xs font-semibold text-cyan-400">方法 2 : 物理多路徑同相相干疊加增益</span>
+                                <span class="bg-cyan-500/10 text-[10px] text-cyan-400 px-2 py-0.5 rounded-md border border-cyan-500/20">實測報告愛用</span>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span id="method2_result" class="text-4xl font-black text-cyan-400">--</span>
+                                <span class="text-sm font-semibold text-cyan-300">dBi</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-2 leading-relaxed font-sans min-h-[44px]" id="formula_math_display">
+                                <!-- 動態顯示對應場景的公式說明 -->
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 認證工程師建議 -->
+                    <div class="mt-4 p-3.5 bg-slate-900/60 rounded-xl border border-slate-800 text-xs text-slate-400 leading-relaxed flex gap-2">
+                        <span class="text-amber-400 flex-shrink-0">💡</span>
+                        <p>
+                            <b>專家提示：</b>方法 2 考慮了實際的空間流路由與功率分配，其計算結果通常<b>小於 or 等於</b>方法 1。在申報時，採用<b>方法 2</b> 可爭取更低的天線增益，進而避免不必要的功率調降。
+                        </p>
+                    </div>
+                </section>
+
+                <!-- 1.8. KDB 662911 官方條款符合性判定證明 -->
+                <section class="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800 p-6 shadow-xl">
+                    <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        KDB 662911 官方條款符合性判定證明
+                    </h3>
+                    
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3 text-xs leading-relaxed text-slate-300">
+                        <div class="flex justify-between border-b border-slate-850 pb-2">
+                            <span class="text-slate-500">當前套用 KDB 條款：</span>
+                            <span id="kdb_clause_id" class="font-mono text-cyan-400 font-bold">--</span>
+                        </div>
+                        <div class="flex justify-between border-b border-slate-850 pb-2">
+                            <span class="text-slate-500">天線極化狀態：</span>
+                            <span id="kdb_polarization_display" class="font-semibold text-slate-200">--</span>
+                        </div>
+                        <div class="flex justify-between border-b border-slate-850 pb-2">
+                            <span class="text-slate-500">陣列增益 (Array Gain)：</span>
+                            <span id="kdb_array_gain_display" class="font-mono text-amber-400 font-semibold">--</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-500 block mb-1">法規審查意見說明：</span>
+                            <p id="kdb_audit_remark" class="text-slate-400 text-[11px] bg-slate-900/40 p-2.5 rounded-lg border border-slate-850/80 animate-fade">
+                                --
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2.0. 法規限值與功率/PSD/EIRP/DG 智慧聯立換算矩陣 (全新核心功能) -->
+                <section class="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800 p-6 shadow-xl space-y-6">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                        </div>
+                        <h2 class="text-lg font-bold text-white">Part 15.247 / 15.407 聯立換算矩陣</h2>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- 法規目標規格選擇 -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-2">目標射頻法規標準</label>
+                                <select id="reg_band_select" onchange="calculateRegulatoryLimits()" class="w-full bg-slate-950 text-slate-200 border border-slate-800 rounded-lg p-2.5 text-xs focus:ring-1 focus:ring-cyan-500">
+                                    <option value="fcc_dts_24">FCC 15.247 (2.4G DTS) [Conducted Base]</option>
+                                    <option value="fcc_dts_58">FCC 15.247 (5.8G DTS) [Conducted Base]</option>
+                                    <option value="fcc_unii1">FCC 15.407 (5G U-NII-1 Master AP) [Conducted Base]</option>
+                                    <option value="fcc_unii2">FCC 15.407 (5G U-NII-2A / 2C) [Conducted Base]</option>
+                                    <option value="fcc_unii3">FCC 15.407 (5G U-NII-3) [Conducted Base]</option>
+                                    <option value="fcc_unii4">FCC 15.407 (5.9G U-NII-4 Indoor AP) [EIRP Base]</option>
+                                    <option value="fcc_unii5_std">FCC 15.407 (6G U-NII-5/7 Standard AP) [EIRP Base]</option>
+                                    <option value="fcc_unii5_lpi">FCC 15.407 (6G U-NII-5~8 LPI Indoor AP) [EIRP Base]</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-2">傳輸鏈接模式 / 頻寬設定</label>
+                                <div class="flex gap-2">
+                                    <select id="link_type" onchange="calculateRegulatoryLimits()" class="flex-1 bg-slate-950 text-slate-200 border border-slate-800 rounded-lg p-2.5 text-xs focus:ring-1 focus:ring-cyan-500">
+                                        <option value="ptm">Point-to-Multipoint (P to M / MB)</option>
+                                        <option value="ptp">Fixed Point-to-Point (P to P)</option>
+                                    </select>
+                                    <!-- 只有 UNII-2 顯示頻寬設定 -->
+                                    <div id="bw_input_wrapper" class="hidden w-24">
+                                        <input id="ch_bandwidth" type="number" value="20" min="5" max="160" oninput="calculateRegulatoryLimits()" class="w-full bg-slate-950 text-slate-200 border border-slate-800 rounded-lg p-2.5 text-xs text-center focus:ring-1 focus:ring-cyan-500" placeholder="26dB BW">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 聯立運算分析儀表格 -->
+                        <div class="bg-slate-950 rounded-xl border border-slate-850 p-4 space-y-4">
+                            <div class="text-xs text-slate-400 flex justify-between items-center pb-2 border-b border-slate-850">
+                                <span>換算對象</span>
+                                <span class="font-bold text-slate-200">當前動態換算結果</span>
+                            </div>
+
+                            <!-- 1. Conducted Power Limit -->
+                            <div class="flex justify-between items-center text-sm">
+                                <div>
+                                    <span class="block text-xs font-semibold text-slate-300">最終傳導輸出功率限值 (Conducted Power)</span>
+                                    <span class="text-[10px] text-slate-500" id="power_formula_math">--</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-base font-bold text-emerald-400 font-mono" id="conducted_power_limit_val">--</span>
+                                    <span class="text-xs text-slate-500">dBm</span>
+                                </div>
+                            </div>
+
+                            <!-- 2. Conducted PSD Limit -->
+                            <div class="flex justify-between items-center text-sm pt-2 border-t border-slate-900">
+                                <div>
+                                    <span class="block text-xs font-semibold text-slate-300">最終傳導功率頻譜密度限值 (Conducted PSD)</span>
+                                    <span class="text-[10px] text-slate-500" id="psd_formula_math">--</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-base font-bold text-emerald-400 font-mono" id="conducted_psd_limit_val">--</span>
+                                    <span class="text-xs text-slate-500" id="psd_unit_label">dBm/MHz</span>
+                                </div>
+                            </div>
+
+                            <!-- 3. Calculated EIRP Limit -->
+                            <div class="flex justify-between items-center text-sm pt-2 border-t border-slate-900">
+                                <div>
+                                    <span class="block text-xs font-semibold text-slate-300">最終等效等向輻射功率限值 (EIRP Power)</span>
+                                    <span class="text-[10px] text-slate-500" id="eirp_formula_math">--</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-base font-bold text-cyan-400 font-mono" id="eirp_power_limit_val">--</span>
+                                    <span class="text-xs text-slate-500">dBm</span>
+                                </div>
+                            </div>
+
+                            <!-- 4. Calculated EIRP PSD Limit -->
+                            <div class="flex justify-between items-center text-sm pt-2 border-t border-slate-900">
+                                <div>
+                                    <span class="block text-xs font-semibold text-slate-300">最終等效等向 PSD 限值 (EIRP PSD)</span>
+                                    <span class="text-[10px] text-slate-500" id="eirp_psd_formula_math">--</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-base font-bold text-cyan-400 font-mono" id="eirp_psd_limit_val">--</span>
+                                    <span class="text-xs text-slate-500" id="eirp_psd_unit_label">dBm/MHz</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 聯立關係小註解 -->
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-850 text-[11px] text-slate-500 leading-relaxed space-y-1">
+                            <p class="font-semibold text-slate-400">📝 射頻工程聯立對齊常識：</p>
+                            <p>1. <b>Conducted Base (傳導基礎)</b> 法規規定傳導限值，當 $DG > 6\text{ dBi}$ 時，傳導限值調降；EIRP 極限值隨之變動。</p>
+                            <p>2. <b>EIRP Base (EIRP 基礎 - 如 6G Wi-Fi 6E/7/8)</b> 法規僅限制 EIRP。傳導功率限值與天線定向增益 $DG$ 呈現完全的 $1:1$ 二元一次聯立扣減關係：$\text{Conducted Limit} = \text{EIRP Limit} - DG$。</p>
+                        </div>
+                    </div>
+                </section>
+
+            </aside>
+            
+        </div>
+
+        <!-- 頁尾聲明 -->
+        <footer class="mt-12 pt-6 border-t border-slate-900 text-center text-xs text-slate-500">
+            <p>MIMO Directional Gain Compliance Calculator. 依據 FCC KDB 662911 D01 v02r01 官方核心演算法完整開發</p>
+            <p class="mt-1">© 2026 無線認證專家 Sam Chen ‧ Version V1.0 ‧ 專業嚴謹射頻相容性模擬系統</p>
+        </footer>
+    </div>
+
+    <!-- 自定義訊息提示 UI -->
+    <div id="toast_container" class="fixed bottom-6 right-6 z-50 space-y-2 pointer-events-none"></div>
+
+    <script>
+        // --- 1. 全域變數定義 ---
+        let state = {
+            scenario: 'ii',       // 'ii' or 'iii'
+            nAnt: 4,              // 天線數 (2-8)
+            nSs: 2,               // 空間流數 (1-8)
+            gains: [3.5, 4.2, 2.8, 5.0, 3.0, 3.0, 3.0, 3.0], // 天線 Gain 清單
+            connections: [],      // [ss][ant] = true/false
+            powers: [],           // [ss][ant] = 相對歸一化功率 P_j,k
+            
+            // 法規模式設定
+            polarization: 'co',   // 'co' (共極化) or 'cross' (交叉極化)
+            techMode: 'correlated', // 'correlated' (相干), 'uncorrelated' (不相干), 'cdd' (Wi-Fi CDD)
+            cddSubMode: 'psd'     // 'psd', 'power_40m', 'power_20m'
+        };
+
+        // 預設檔配置
+        const PRESETS = {
+            wifi6e_2x2: {
+                nAnt: 2,
+                nSs: 2,
+                scenario: 'ii',
+                polarization: 'co',
+                techMode: 'cdd',
+                cddSubMode: 'psd',
+                gains: [3.0, 4.5],
+                connections: [
+                    [true, false],
+                    [false, true]
+                ],
+                powers: [
+                    [1.0, 0.0],
+                    [0.0, 1.0]
+                ]
+            },
+            wifi7_4x4: {
+                nAnt: 4,
+                nSs: 2,
+                scenario: 'iii',
+                polarization: 'co',
+                techMode: 'correlated',
+                cddSubMode: 'psd',
+                gains: [3.2, 4.0, 4.8, 2.5],
+                connections: [
+                    [true, true, false, false],
+                    [false, false, true, true]
+                ],
+                powers: [
+                    [1.0, 1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 1.0]
+                ]
+            },
+            cross_pol_2x2: {
+                nAnt: 2,
+                nSs: 2,
+                scenario: 'ii',
+                polarization: 'cross',
+                techMode: 'correlated',
+                cddSubMode: 'psd',
+                gains: [2.5, 5.2], 
+                connections: [
+                    [true, false],
+                    [false, true]
+                ],
+                powers: [
+                    [1.0, 0.0],
+                    [0.0, 1.0]
+                ]
+            }
+        };
+
+        // --- 2. 系統初始化與事件綁定 ---
+        window.onload = function() {
+            initMatrixDimensions();
+            loadPreset('wifi6e_2x2');
+        };
+
+        function initMatrixDimensions() {
+            state.connections = Array(8).fill(null).map(() => Array(8).fill(false));
+            state.powers = Array(8).fill(null).map(() => Array(8).fill(0.0));
+
+            for (let j = 0; j < 8; j++) {
+                for (let k = 0; k < 8; k++) {
+                    if (j === k % state.nSs) {
+                        state.connections[j][k] = true;
+                        state.powers[j][k] = 1.0;
+                    }
+                }
+            }
+        }
+
+        // --- 3. 核心介面動態渲染與控制 ---
+
+        function updateAntennaCount(val) {
+            state.nAnt = parseInt(val);
+            document.getElementById('nAnt_val').innerText = state.nAnt;
+            
+            const nSsInput = document.getElementById('nSs');
+            if (state.nSs > state.nAnt) {
+                state.nSs = state.nAnt;
+                nSsInput.value = state.nSs;
+                document.getElementById('nSs_val').innerText = state.nSs;
+            }
+            nSsInput.max = 8;
+
+            renderAntennaGainInputs();
+            renderRoutingMatrix();
+            triggerCalculation();
+        }
+
+        function updateSpatialStreamCount(val) {
+            state.nSs = parseInt(val);
+            
+            if (state.nSs > state.nAnt) {
+                state.nAnt = state.nSs;
+                document.getElementById('nAnt').value = state.nAnt;
+                document.getElementById('nAnt_val').innerText = state.nAnt;
+                renderAntennaGainInputs();
+                showToast(`已自動將天線數增至 ${state.nAnt} 以符合 N_SS <= N_ANT 射頻物理限制`, "success");
+            }
+            
+            document.getElementById('nSs_val').innerText = state.nSs;
+            renderRoutingMatrix();
+            triggerCalculation();
+        }
+
+        function updateTechConfig() {
+            state.polarization = document.getElementById('polarization').value;
+            state.techMode = document.getElementById('tech_mode').value;
+            
+            const cddWrapper = document.getElementById('cdd_config_wrapper');
+            if (state.techMode === 'cdd') {
+                cddWrapper.classList.remove('hidden');
+                state.cddSubMode = document.getElementById('cdd_sub_mode').value;
+            } else {
+                cddWrapper.classList.add('hidden');
+            }
+
+            renderRoutingMatrix();
+            triggerCalculation();
+        }
+
+        function switchScenario(scen) {
+            const isII = (scen === 'ii');
+            state.scenario = scen;
+            
+            document.getElementById('label_scenario_ii').className = isII 
+                ? "relative flex flex-col p-4 bg-slate-950 rounded-xl border-2 border-cyan-500 cursor-pointer transition"
+                : "relative flex flex-col p-4 bg-slate-950 rounded-xl border-2 border-slate-800 cursor-pointer hover:border-slate-700 transition";
+            document.getElementById('label_scenario_iii').className = !isII 
+                ? "relative flex flex-col p-4 bg-slate-950 rounded-xl border-2 border-cyan-500 cursor-pointer transition"
+                : "relative flex flex-col p-4 bg-slate-950 rounded-xl border-2 border-slate-800 cursor-pointer hover:border-slate-700 transition";
+
+            document.getElementById('dot_scenario_ii').className = isII ? "w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block" : "w-2.5 h-2.5 rounded-full bg-slate-700 inline-block";
+            document.getElementById('dot_scenario_iii').className = !isII ? "w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block" : "w-2.5 h-2.5 rounded-full bg-slate-700 inline-block";
+
+            const pHelper = document.getElementById('power_helper_buttons');
+            const nIndicator = document.getElementById('normalization_indicator');
+            const mDesc = document.getElementById('matrix_desc');
+
+            if (isII) {
+                pHelper.classList.add('hidden');
+                nIndicator.classList.add('hidden');
+                mDesc.innerHTML = '設定天線被哪一個空間流驅動 (每一天線限連單一空間流)';
+            } else {
+                pHelper.classList.remove('hidden');
+                nIndicator.classList.remove('hidden');
+                mDesc.innerHTML = '天線可由多個空間流共同驅動，並需設定各連接路徑之歸一化相對功率 $P_{j,k}$';
+                autoNormalizePower(); 
+            }
+
+            renderRoutingMatrix();
+            triggerCalculation();
+        }
+
+        function renderAntennaGainInputs() {
+            const container = document.getElementById('antenna_gains_container');
+            container.innerHTML = '';
+            
+            for (let k = 0; k < state.nAnt; k++) {
+                const gainVal = state.gains[k] !== undefined ? state.gains[k] : 3.0;
+                const div = document.createElement('div');
+                div.className = "bg-slate-950 p-3 rounded-xl border border-slate-850 flex flex-col gap-1";
+                div.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-bold text-slate-400">Ant ${k+1}</span>
+                        <span class="text-[10px] text-cyan-400 font-mono">G${k+1}</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <input type="number" step="0.1" value="${gainVal}" 
+                            oninput="updateSingleGain(${k}, this.value)" 
+                            class="w-full bg-slate-900 border border-slate-800 rounded-lg py-1 px-2 text-xs font-mono text-white text-right focus:outline-none focus:border-cyan-500">
+                        <span class="text-[10px] text-slate-500">dBi</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        function updateSingleGain(index, val) {
+            const parsed = parseFloat(val);
+            if (!isNaN(parsed)) {
+                state.gains[index] = parsed;
+                triggerCalculation();
+            }
+        }
+
+        function setAllGainsEqual() {
+            const firstVal = state.gains[0] !== undefined ? state.gains[0] : 3.0;
+            for (let k = 0; k < state.nAnt; k++) {
+                state.gains[k] = firstVal;
+            }
+            showToast("成功！已將所有天線 Gain 同步設為 " + firstVal + " dBi");
+            renderAntennaGainInputs();
+            triggerCalculation();
+        }
+
+        function renderRoutingMatrix() {
+            const headerRow = document.getElementById('matrix_header_antennas');
+            headerRow.innerHTML = '<th class="p-2 border-r border-slate-800/60"></th>';
+            for (let k = 0; k < state.nAnt; k++) {
+                headerRow.innerHTML += `
+                    <th class="p-2 text-slate-400 font-mono text-xs">
+                        Ant ${k+1} <br/> <span class="text-[10px] text-slate-500">(${state.gains[k]} dBi)</span>
+                    </th>
+                `;
+            }
+
+            const body = document.getElementById('routing_matrix_body');
+            body.innerHTML = '';
+
+            for (let j = 0; j < state.nSs; j++) {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-900/30 transition";
+                
+                let ssCell = `
+                    <td class="p-3 border-r border-slate-800/60 bg-slate-900/10 font-bold text-xs text-slate-300">
+                        空間流 ${j+1} <br/>
+                        <span class="text-[9px] font-normal text-slate-500">Spatial Stream ${j+1}</span>
+                    </td>
+                `;
+                tr.innerHTML = ssCell;
+
+                for (let k = 0; k < state.nAnt; k++) {
+                    const isConnected = state.connections[j][k];
+                    const powerVal = state.powers[j][k];
+                    
+                    let cellContent = '';
+                    if (state.scenario === 'ii') {
+                        cellContent = `
+                            <td class="p-3 text-center">
+                                <label class="inline-flex flex-col items-center justify-center cursor-pointer group">
+                                    <input type="radio" name="antenna_driver_${k}" ${isConnected ? 'checked' : ''} 
+                                        onchange="toggleConnectionII(${j}, ${k})" 
+                                        class="accent-cyan-500 w-4 h-4 rounded-full border border-slate-700 bg-slate-950 focus:ring-0">
+                                    <span class="text-[10px] mt-1 text-slate-500 group-hover:text-slate-400">驅動</span>
+                                </label>
+                            </td>
+                        `;
+                    } else {
+                        cellContent = `
+                            <td class="p-3 text-center">
+                                <div class="flex flex-col items-center gap-1.5">
+                                    <input type="checkbox" ${isConnected ? 'checked' : ''} 
+                                        onchange="toggleConnectionIII(${j}, ${k})" 
+                                        class="accent-emerald-500 w-4 h-4 rounded border-slate-700 bg-slate-950 focus:ring-0">
+                                    
+                                    <div class="${isConnected ? 'flex' : 'hidden'} items-center gap-1">
+                                        <span class="text-[9px] text-slate-500">$P$:</span>
+                                        <input type="number" step="0.1" min="0" value="${powerVal.toFixed(2)}" 
+                                            oninput="updatePathPower(${j}, ${k}, this.value)" 
+                                            class="w-12 bg-slate-900 border border-slate-800 rounded py-0.5 px-1 text-center font-mono text-[10px] text-emerald-400 focus:outline-none focus:border-emerald-500">
+                                    </div>
+                                </div>
+                            </td>
+                        `;
+                    }
+                    tr.innerHTML += cellContent;
+                }
+                body.appendChild(tr);
+            }
+
+            updatePowerStatus();
+            drawRoutingTopology();
+        }
+
+        function toggleConnectionII(selectedStream, selectedAnt) {
+            for (let j = 0; j < state.nSs; j++) {
+                state.connections[j][selectedAnt] = (j === selectedStream);
+                state.powers[j][selectedAnt] = (j === selectedStream) ? 1.0 : 0.0;
+            }
+            renderRoutingMatrix();
+            triggerCalculation();
+        }
+
+        function toggleConnectionIII(stream, ant) {
+            const isChecked = !state.connections[stream][ant];
+            state.connections[stream][ant] = isChecked;
+            state.powers[stream][ant] = isChecked ? 1.0 : 0.0;
+
+            renderRoutingMatrix();
+            triggerCalculation();
+        }
+
+        function updatePathPower(stream, ant, val) {
+            const parsed = parseFloat(val);
+            if (!isNaN(parsed) && parsed >= 0) {
+                state.powers[stream][ant] = parsed;
+                calculatePowerSumAndUI();
+                triggerCalculationOnly(); 
+            }
+        }
+
+        function triggerCalculationOnly() {
+            const calculatedResults = runCalculations();
+            displayResults(calculatedResults);
+            calculateRegulatoryLimits();
+        }
+
+        function autoNormalizePower() {
+            let activeConnections = [];
+            for (let j = 0; j < state.nSs; j++) {
+                for (let k = 0; k < state.nAnt; k++) {
+                    if (state.connections[j][k]) {
+                        activeConnections.push({j, k});
+                    }
+                }
+            }
+
+            if (activeConnections.length === 0) {
+                showToast("錯誤：請先在表格中勾選至少一條訊號路徑！", "error");
+                return;
+            }
+
+            const equalShare = state.nAnt / activeConnections.length;
+
+            for (let j = 0; j < state.nSs; j++) {
+                for (let k = 0; k < state.nAnt; k++) {
+                    if (state.connections[j][k]) {
+                        state.powers[j][k] = equalShare;
+                    } else {
+                        state.powers[j][k] = 0.0;
+                    }
+                }
+            }
+
+            showToast("等功耗自動歸一化完成！總功率已對齊至 " + state.nAnt);
+            renderRoutingMatrix();
+            triggerCalculation();
+        }
+
+        function calculatePowerSumAndUI() {
+            let totalPowerSum = 0;
+            for (let j = 0; j < state.nSs; j++) {
+                for (let k = 0; k < state.nAnt; k++) {
+                    if (state.connections[j][k]) {
+                        totalPowerSum += state.powers[j][k];
+                    }
+                }
+            }
+
+            const targetSum = state.nAnt;
+            const powerSumDisplay = document.getElementById('power_sum_display');
+            const targetSumDisplay = document.getElementById('target_sum_display');
+            const statusDiv = document.getElementById('normalization_status');
+
+            powerSumDisplay.innerText = totalPowerSum.toFixed(3);
+            targetSumDisplay.innerText = targetSum.toFixed(2);
+
+            const isNormalized = Math.abs(totalPowerSum - targetSum) < 0.005;
+
+            if (isNormalized) {
+                statusDiv.className = "flex items-center gap-1.5 text-emerald-400";
+                statusDiv.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> 功率已精準歸一化符合法規`;
+            } else {
+                statusDiv.className = "flex items-center gap-1.5 text-amber-500 animate-pulse";
+                statusDiv.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500"></span> ⚠️ 未符合歸一化限制 (應等於 ${targetSum})`;
+            }
+        }
+
+        function updatePowerStatus() {
+            if (state.scenario === 'iii') {
+                calculatePowerSumAndUI();
+            }
+        }
+
+        // --- 4. 核心數學引擎 Directional Gain Calculations (KDB 完全符合) ---
+
+        function triggerCalculation() {
+            const calculatedResults = runCalculations();
+            displayResults(calculatedResults);
+            calculateRegulatoryLimits();
+        }
+
+        // 單一偏振子陣列的方向性增益計算
+        function calculateSubArrayDG(gains, nAnt, nSs, connections, powers) {
+            const gAntMax = Math.max(...gains);
+
+            // A. 不相關模式 (Section F)2)d)(ii))
+            if (state.techMode === 'uncorrelated') {
+                let sumLinear = 0.0;
+                for (let k = 0; k < nAnt; k++) {
+                    sumLinear += Math.pow(10, gains[k] / 10);
+                }
+                const dgRigorous = 10 * Math.log10(sumLinear / nAnt);
+                return {
+                    method1: gAntMax, 
+                    method2: dgRigorous,
+                    gAntMax: gAntMax,
+                    arrayGain: 0.0
+                };
+            }
+
+            // B. Wi-Fi CDD 豁免計算 (Section F)2)f))
+            if (state.techMode === 'cdd') {
+                let arrayGain = 0.0;
+                let method1 = gAntMax;
+                let method2 = 0.0;
+
+                if (state.cddSubMode === 'power_40m') {
+                    arrayGain = 0.0;
+                    method1 = gAntMax;
+                    
+                    let sumLinear = 0.0;
+                    for (let k = 0; k < nAnt; k++) {
+                        sumLinear += Math.pow(10, gains[k] / 10);
+                    }
+                    method2 = 10 * Math.log10(sumLinear / nAnt);
+                    if (method2 > gAntMax) method2 = gAntMax;
+                } 
+                else if (state.cddSubMode === 'power_20m') {
+                    if (nAnt <= 4) {
+                        arrayGain = 0.0;
+                    } else {
+                        arrayGain = Math.min(5 * Math.log10(nAnt / nSs), 3.0);
+                    }
+                    method1 = gAntMax + arrayGain;
+                    method2 = gAntMax + arrayGain; 
+                } 
+                else {
+                    arrayGain = 10 * Math.log10(nAnt / nSs);
+                    method1 = gAntMax + arrayGain;
+                    
+                    let outerSum = 0.0;
+                    const isII = (state.scenario === 'ii');
+                    for (let j = 0; j < nSs; j++) {
+                        let innerSum = 0.0;
+                        for (let k = 0; k < nAnt; k++) {
+                            if (connections[j][k]) {
+                                const g_jk = Math.pow(10, gains[k] / 20);
+                                if (isII) {
+                                    innerSum += g_jk;
+                                } else {
+                                    const p_jk = powers[j][k];
+                                    innerSum += g_jk * Math.sqrt(p_jk);
+                                }
+                            }
+                        }
+                        outerSum += Math.pow(innerSum, 2);
+                    }
+                    method2 = 10 * Math.log10(outerSum / nAnt);
+                }
+
+                return {
+                    method1: method1,
+                    method2: method2,
+                    gAntMax: gAntMax,
+                    arrayGain: arrayGain
+                };
+            }
+
+            // C. 標準相干/波束成型模式 (Section F)2)e))
+            const arrayGain = 10 * Math.log10(nAnt / nSs);
+            const method1 = gAntMax + arrayGain;
+            let method2 = 0.0;
+
+            let outerSum = 0.0;
+            const isII = (state.scenario === 'ii');
+            for (let j = 0; j < nSs; j++) {
+                let innerSum = 0.0;
+                for (let k = 0; k < nAnt; k++) {
+                    if (connections[j][k]) {
+                        const g_jk = Math.pow(10, gains[k] / 20);
+                        if (isII) {
+                            innerSum += g_jk;
+                        } else {
+                            const p_jk = powers[j][k];
+                            innerSum += g_jk * Math.sqrt(p_jk);
+                        }
+                    }
+                }
+                outerSum += Math.pow(innerSum, 2);
+            }
+            method2 = 10 * Math.log10(outerSum / nAnt);
+
+            return {
+                method1: method1,
+                method2: method2,
+                gAntMax: gAntMax,
+                arrayGain: arrayGain
+            };
+        }
+
+        // 全域計算（包含交叉極化分組邏輯）
+        function runCalculations() {
+            const nAnt = state.nAnt;
+            const nSs = state.nSs;
+            
+            const activeGains = [];
+            for (let k = 0; k < nAnt; k++) {
+                activeGains.push(state.gains[k] !== undefined ? state.gains[k] : 3.0);
+            }
+            const gAntMax = Math.max(...activeGains);
+
+            // A. 如果選取交叉極化 (Cross-Polarized) 
+            if (state.polarization === 'cross') {
+                if (nAnt === 2) {
+                    return {
+                        method1: gAntMax,
+                        method2: gAntMax,
+                        gAntMax: gAntMax,
+                        arrayGain: 0.0,
+                        clause: 'Section F)2)c)(i)',
+                        auditText: '偵測到雙天線交叉極化配置。依據 KDB 規範，雙端口交叉極化天線不考慮陣列增益（Array Gain = 0 dB），定向增益直接取各極化天線中之最大者 $\\max(G_1, G_2)$。',
+                        activeGains: activeGains
+                    };
+                } else {
+                    const groupH_gains = [];
+                    const groupV_gains = [];
+                    
+                    const connH = Array(8).fill(null).map(() => []);
+                    const connV = Array(8).fill(null).map(() => []);
+                    const powH = Array(8).fill(null).map(() => []);
+                    const powV = Array(8).fill(null).map(() => []);
+
+                    for (let k = 0; k < nAnt; k++) {
+                        if (k % 2 === 0) {
+                            groupH_gains.push(activeGains[k]);
+                            for (let j = 0; j < nSs; j++) {
+                                connH[j].push(state.connections[j][k]);
+                                powH[j].push(state.powers[j][k]);
+                            }
+                        } else {
+                            groupV_gains.push(activeGains[k]);
+                            for (let j = 0; j < nSs; j++) {
+                                connV[j].push(state.connections[j][k]);
+                                powV[j].push(state.powers[j][k]);
+                            }
+                        }
+                    }
+
+                    const nAntH = groupH_gains.length;
+                    const nAntV = groupV_gains.length;
+                    const nSsH = Math.min(nSs, nAntH);
+                    const nSsV = Math.min(nSs, nAntV);
+
+                    const resH = calculateSubArrayDG(groupH_gains, nAntH, nSsH, connH, powH);
+                    const resV = calculateSubArrayDG(groupV_gains, nAntV, nSsV, connV, powV);
+
+                    const finalM1 = Math.max(resH.method1, resV.method1);
+                    const finalM2 = Math.max(resH.method2, resV.method2);
+                    const finalAG = Math.max(resH.arrayGain, resV.arrayGain);
+
+                    return {
+                        method1: finalM1,
+                        method2: finalM2,
+                        gAntMax: gAntMax,
+                        arrayGain: finalAG,
+                        clause: 'Section F)2)c)(ii)',
+                        auditText: `偵測到多天線正交極化陣列。系統已依 KDB 規範將發射天線拆分為 H極化組(${nAntH}根) 與 V極化組(${nAntV}根) 子陣列，獨立套用 ${state.techMode === 'uncorrelated' ? '不相關' : '相干'} 算法：\n- H極化組增益：${resH.method2.toFixed(3)} dBi\n- V極化組增益：${resV.method2.toFixed(3)} dBi\n最終定向增益採用兩組極化結果之最大值。`,
+                        activeGains: activeGains
+                    };
+                }
+            }
+
+            // B. 共極化 (Co-Polarized) 標準計算
+            const res = calculateSubArrayDG(activeGains, nAnt, nSs, state.connections, state.powers);
+
+            let clause = 'Section F)2)e)';
+            let auditText = '';
+
+            if (state.techMode === 'uncorrelated') {
+                clause = 'Section F)2)d)(ii)';
+                auditText = '完全不相關信號傳輸模式（如 STBC 且無 CDD）。Array Gain 自動歸零。定向增益採用不相關功率相加對數算式。相較於標準 Beamforming 模式，此模式能有效排除天線同相相干疊加。';
+            } else if (state.techMode === 'cdd') {
+                clause = 'Section F)2)f)';
+                if (state.cddSubMode === 'power_40m') {
+                    auditText = `套用 KDB CDD 寬頻豁免條款：因頻道頻寬大於等於 40 MHz，針對功率量測免除陣列增益（Array Gain = 0 dB），定向增益直接等同天線最大增益 ${gAntMax.toFixed(2)} dBi。`;
+                } else if (state.cddSubMode === 'power_20m') {
+                    if (nAnt <= 4) {
+                        auditText = `套用 KDB CDD 窄頻豁免條款：針對 20 MHz 功率量測，<b>因當前天線數 $N_{ANT} = ${nAnt} \\le 4$</b>，依據 KDB Footnote 豁免條件，不考慮陣列增益（Array Gain = 0 dB），定向增益等同最大天線增益 ${gAntMax.toFixed(2)} dBi。`;
+                    } else {
+                        auditText = `套用 KDB CDD 窄頻豁免條款：針對 20 MHz 功率量測，<b>因天線數 $N_{ANT} = ${nAnt} \\ge 5$</b>，Array Gain 計算公式適用 $5 \\log_{10}(N_{ANT}/N_{SS}) = ${res.arrayGain.toFixed(2)}$ dB（法規上限限制為 3 dB）。`;
+                    }
+                } else {
+                    auditText = '套用 KDB CDD PSD 標準相干合成條款：因屬於 PSD 量測，仍必須考量最高 $10\\log_{10}(N_{ANT}/N_{SS})$ 陣列增益。';
+                }
+            } else {
+                auditText = `標準 MIMO / Beamforming 相干波束成型傳輸模式。必須嚴格計算天線同相相干相加。系統同時輸出極限包絡值（方法1：${res.method1.toFixed(3)} dBi）與精確路徑疊加值（方法2：${res.method2.toFixed(3)} dBi）。建議採用方法2申報。`;
+            }
+
+            return {
+                method1: res.method1,
+                method2: res.method2,
+                gAntMax: gAntMax,
+                arrayGain: res.arrayGain,
+                clause: clause,
+                auditText: auditText,
+                activeGains: activeGains
+            };
+        }
+
+        // 智慧延遲排版引擎 (防抖動優化，滑動滑桿極其流暢)
+        let mathjaxTimeout = null;
+        function triggerMathJax() {
+            if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+                if (mathjaxTimeout) clearTimeout(mathjaxTimeout);
+                mathjaxTimeout = setTimeout(() => {
+                    const el1 = document.getElementById('formula_math_display');
+                    const el2 = document.getElementById('method1_formula_desc');
+                    const el3 = document.getElementById('kdb_audit_remark');
+                    const el4 = document.getElementById('power_formula_math');
+                    const el5 = document.getElementById('psd_formula_math');
+                    const el6 = document.getElementById('eirp_formula_math');
+                    const el7 = document.getElementById('eirp_psd_formula_math');
+                    const elements = [el1, el2, el3, el4, el5, el6, el7].filter(Boolean);
+                    
+                    if (elements.length > 0) {
+                        MathJax.typesetClear(elements);
+                        MathJax.typesetPromise(elements).catch(err => {
+                            console.warn("MathJax 渲染失敗:", err);
+                        });
+                    }
+                }, 150); // 150ms 延遲排版
+            }
+        }
+
+        // 將結果渲染至畫面
+        function displayResults(res) {
+            document.getElementById('method1_result').innerText = res.method1.toFixed(3);
+            document.getElementById('method2_result').innerText = res.method2.toFixed(3);
+
+            const m1Desc = document.getElementById('method1_formula_desc');
+            if (state.techMode === 'uncorrelated') {
+                m1Desc.innerHTML = '公式: $G_{ANT\\ MAX}$ (不相關模式下無陣列增益)';
+            } else if (state.techMode === 'cdd' && state.cddSubMode !== 'psd') {
+                m1Desc.innerHTML = `公式: $G_{ANT\\ MAX} + Array\\ Gain$ (Array Gain = ${res.arrayGain.toFixed(2)} dB)`;
+            } else {
+                m1Desc.innerHTML = '公式: $G_{ANT\\ MAX} + 10 \\log_{10}(N_{ANT}/N_{SS})$';
+            }
+
+            const formulaDiv = document.getElementById('formula_math_display');
+            if (state.techMode === 'uncorrelated') {
+                formulaDiv.innerHTML = `
+                    當前運算: $10 \\log_{10} \\left[ \\frac{\\sum_{k=1}^{N_{ANT}} 10^{G_k/10}}{N_{ANT}} \\right]$ <br/>
+                    <span class="text-[10px] text-slate-500 font-mono">符合不相關相加公式 (Section F)2)d)(ii))</span>
+                `;
+            } else if (state.scenario === 'ii') {
+                formulaDiv.innerHTML = `
+                    當前運算: $10 \\log_{10} \\left[ \\frac{\\sum_{j=1}^{N_{SS}} \\left\\{ \\sum_{k=1}^{N_{ANT}} g_{j,k} \\right\\}^2}{N_{ANT}} \\right]$ <br/>
+                    <span class="text-[10px] text-slate-500 font-mono">其中 $g_{j,k} = 10^{G_k/20}$，無連路則為 0</span>
+                `;
+            } else {
+                formulaDiv.innerHTML = `
+                    當前運算: $10 \\log_{10} \\left[ \\frac{\\sum_{j=1}^{N_{SS}} \\left\\{ \\sum_{k=1}^{N_{ANT}} g_{j,k} \\sqrt{P_{j,k}} \\right\\}^2}{N_{ANT}} \\right]$ <br/>
+                    <span class="text-[10px] text-slate-500 font-mono">其中 $P_{j,k}$ 為歸一化相對功率分佈</span>
+                `;
+            }
+
+            document.getElementById('kdb_clause_id').innerText = res.clause;
+            document.getElementById('kdb_polarization_display').innerText = state.polarization === 'co' ? '共極化 (Co-Pol)' : '交叉極化 (Cross-Pol)';
+            document.getElementById('kdb_array_gain_display').innerText = `${res.arrayGain.toFixed(2)} dB`;
+            document.getElementById('kdb_audit_remark').innerHTML = res.auditText;
+
+            // 即時啟動 MathJax 重新排版
+            triggerMathJax();
+        }
+
+        // --- 5. 核心法規與功率/PSD/EIRP 聯立智慧換算矩陣 (KDB & Sporton 規範整合) ---
+
+        function calculateRegulatoryLimits() {
+            const regSelect = document.getElementById('reg_band_select');
+            const linkType = document.getElementById('link_type').value;
+            const bwInputWrapper = document.getElementById('bw_input_wrapper');
+            const isP2P = (linkType === 'ptp');
+
+            // 讀取當前天線定向增益計算值 (以精確方法 2 為準)
+            const calculatedResults = runCalculations();
+            const dg = calculatedResults.method2;
+
+            // 預設基本宣告變數
+            let powerConductedLimit = 30.0;  // 預設傳導 30 dBm
+            let psdConductedLimit = 8.0;     // 預設傳導 8 dBm/3kHz (15.247 DTS)
+            let powerEirpLimit = null;
+            let psdEirpLimit = null;
+            
+            let isEirpBased = false;
+            let psdUnit = 'dBm/3kHz';
+
+            // 顯示與隱藏 15.407 U-NII-2A & 2C 專屬寬度輸入框
+            if (regSelect.value === 'fcc_unii2') {
+                bwInputWrapper.classList.remove('hidden');
+            } else {
+                bwInputWrapper.classList.add('hidden');
+            }
+
+            // 1. 各法規條件之基礎上限與門檻聯立判定
+            switch(regSelect.value) {
+                case 'fcc_dts_24': // FCC 15.247 2.4G DTS
+                    psdUnit = 'dBm/3kHz';
+                    powerConductedLimit = 30.0;
+                    psdConductedLimit = 8.0;
+                    
+                    if (isP2P) {
+                        // 2.4G P to P 減幅規則：DG > 6dBi 時，傳導功率限值每 3 dBi 扣減 1 dB (即 1/3)
+                        let excess = dg - 6.0;
+                        if (excess > 0) {
+                            powerConductedLimit -= (excess / 3.0);
+                            psdConductedLimit -= (excess / 3.0);
+                        }
+                        document.getElementById('power_formula_math').innerText = "運算式: $30 - \\max(0, (DG - 6)/3)$";
+                        document.getElementById('psd_formula_math').innerText = "運算式: $8 - \\max(0, (DG - 6)/3)$";
+                    } else {
+                        // 2.4G P to M 減幅：1:1 扣減
+                        let excess = Math.max(0, dg - 6.0);
+                        powerConductedLimit -= excess;
+                        psdConductedLimit -= excess;
+                        document.getElementById('power_formula_math').innerText = "運算式: $30 - \\max(0, DG - 6)$";
+                        document.getElementById('psd_formula_math').innerText = "運算式: $8 - \\max(0, DG - 6)$";
+                    }
+                    powerEirpLimit = powerConductedLimit + dg;
+                    psdEirpLimit = psdConductedLimit + dg;
+                    document.getElementById('eirp_formula_math').innerText = "運算式: $Conducted\\ Power + DG$";
+                    document.getElementById('eirp_psd_formula_math').innerText = "運算式: $Conducted\\ PSD + DG$";
+                    break;
+
+                case 'fcc_dts_58': // FCC 15.247 5.8G DTS
+                    psdUnit = 'dBm/3kHz';
+                    powerConductedLimit = 30.0;
+                    psdConductedLimit = 8.0;
+
+                    if (isP2P) {
+                        // 5.8G P to P 減幅規則：依據規範，Output Power limits 與 PSD 限值完全不隨天線增益扣減
+                        document.getElementById('power_formula_math').innerText = "運算式: 固定限值 $30\\text{ dBm}$ (P to P 豁免扣減)";
+                        document.getElementById('psd_formula_math').innerText = "運算式: 固定限值 $8\\text{ dBm/3kHz}$ (P to P 豁免扣減)";
+                    } else {
+                        // 5.8G P to M: 1:1 扣減
+                        let excess = Math.max(0, dg - 6.0);
+                        powerConductedLimit -= excess;
+                        psdConductedLimit -= excess;
+                        document.getElementById('power_formula_math').innerText = "運算式: $30 - \\max(0, DG - 6)$";
+                        document.getElementById('psd_formula_math').innerText = "運算式: $8 - \\max(0, DG - 6)$";
+                    }
+                    powerEirpLimit = powerConductedLimit + dg;
+                    psdEirpLimit = psdConductedLimit + dg;
+                    document.getElementById('eirp_formula_math').innerText = "運算式: $Conducted\\ Power + DG$";
+                    document.getElementById('eirp_psd_formula_math').innerText = "運算式: $Conducted\\ PSD + DG$";
+                    break;
+
+                case 'fcc_unii1': // FCC 15.407 U-NII-1 Master AP
+                    psdUnit = 'dBm/MHz';
+                    powerConductedLimit = 30.0;
+                    psdConductedLimit = 17.0;
+
+                    if (isP2P) {
+                        // U-NII-1 P to P: DG 增益大於 23 dBi 時才需 1:1 扣減
+                        let excess = Math.max(0, dg - 23.0);
+                        powerConductedLimit -= excess;
+                        psdConductedLimit -= excess;
+                        document.getElementById('power_formula_math').innerText = "運算式: $30 - \\max(0, DG - 23)$";
+                        document.getElementById('psd_formula_math').innerText = "運算式: $17 - \\max(0, DG - 23)$";
+                    } else {
+                        // U-NII-1 P to M: 大於 6 dBi 時 1:1 扣減
+                        let excess = Math.max(0, dg - 6.0);
+                        powerConductedLimit -= excess;
+                        psdConductedLimit -= excess;
+                        document.getElementById('power_formula_math').innerText = "運算式: $30 - \\max(0, DG - 6)$";
+                        document.getElementById('psd_formula_math').innerText = "運算式: $17 - \\max(0, DG - 6)$";
+                    }
+                    powerEirpLimit = powerConductedLimit + dg;
+                    psdEirpLimit = psdConductedLimit + dg;
+                    document.getElementById('eirp_formula_math').innerText = "運算式: $Conducted\\ Power + DG$";
+                    document.getElementById('eirp_psd_formula_math').innerText = "運算式: $Conducted\\ PSD + DG$";
+                    break;
+
+                case 'fcc_unii2': // FCC 15.407 U-NII-2A & 2C (含 26dB BW 頻寬連動)
+                    psdUnit = 'dBm/MHz';
+                    const bVal = parseFloat(document.getElementById('ch_bandwidth').value) || 20.0;
+                    const bFormulaPower = 11.0 + 10.0 * Math.log10(bVal);
+                    // 基礎傳導功率為 23.98 dBm 或是 11 + 10log(B) 之極小值
+                    const baseU2Power = Math.min(23.98, bFormulaPower);
+                    powerConductedLimit = baseU2Power;
+                    psdConductedLimit = 11.0;
+
+                    let u2Excess = Math.max(0, dg - 6.0);
+                    powerConductedLimit -= u2Excess;
+                    psdConductedLimit -= u2Excess;
+
+                    document.getElementById('power_formula_math').innerText = `運算式: \\min(23.98, 11 + 10\\log(B)) - \\max(0, DG - 6)`;
+                    document.getElementById('psd_formula_math').innerText = "運算式: $11 - \\max(0, DG - 6)$";
+                    
+                    powerEirpLimit = powerConductedLimit + dg;
+                    psdEirpLimit = psdConductedLimit + dg;
+                    document.getElementById('eirp_formula_math').innerText = "運算式: $Conducted\\ Power + DG$";
+                    document.getElementById('eirp_psd_formula_math').innerText = "運算式: $Conducted\\ PSD + DG$";
+                    break;
+
+                case 'fcc_unii3': // FCC 15.407 U-NII-3
+                    psdUnit = 'dBm/500kHz';
+                    powerConductedLimit = 30.0;
+                    psdConductedLimit = 30.0;
+
+                    if (isP2P) {
+                        // U-NII-3 P to P: 功率與 PSD 豁免，免除任何 DG 超額扣減
+                        document.getElementById('power_formula_math').innerText = "運算式: 固定限值 $30\\text{ dBm}$ (P to P 豁免扣減)";
+                        document.getElementById('psd_formula_math').innerText = "運算式: 固定限值 $30\\text{ dBm/500kHz}$ (P to P 豁免扣減)";
+                    } else {
+                        // P to M: 1:1 扣減
+                        let excess = Math.max(0, dg - 6.0);
+                        powerConductedLimit -= excess;
+                        psdConductedLimit -= excess;
+                        document.getElementById('power_formula_math').innerText = "運算式: $30 - \\max(0, DG - 6)$";
+                        document.getElementById('psd_formula_math').innerText = "運算式: $30 - \\max(0, DG - 6)$";
+                    }
+                    powerEirpLimit = powerConductedLimit + dg;
+                    psdEirpLimit = psdConductedLimit + dg;
+                    document.getElementById('eirp_formula_math').innerText = "運算式: $Conducted\\ Power + DG$";
+                    document.getElementById('eirp_psd_formula_math').innerText = "運算式: $Conducted\\ PSD + DG$";
+                    break;
+
+                case 'fcc_unii4': // FCC 15.407 U-NII-4 Indoor AP (EIRP Base)
+                    psdUnit = 'dBm/MHz';
+                    isEirpBased = true;
+                    powerEirpLimit = 36.0;  // U-NII-4 Indoor AP EIRP limit
+                    psdEirpLimit = 20.0;    // U-NII-4 Indoor AP EIRP PSD limit
+
+                    // 1:1 聯立扣減關係: Conducted = EIRP - DG
+                    powerConductedLimit = powerEirpLimit - dg;
+                    psdConductedLimit = psdEirpLimit - dg;
+
+                    document.getElementById('power_formula_math').innerText = "聯立式: $EIRP\\ Power (36) - DG$";
+                    document.getElementById('psd_formula_math').innerText = "聯立式: $EIRP\\ PSD (20) - DG$";
+                    document.getElementById('eirp_formula_math').innerText = "固定法規極限值: $36\\text{ dBm}$";
+                    document.getElementById('eirp_psd_formula_math').innerText = "固定法規極限值: $20\\text{ dBm/MHz}$";
+                    break;
+
+                case 'fcc_unii5_std': // FCC 15.407 U-NII-5~8 Standard AP (EIRP Base)
+                    psdUnit = 'dBm/MHz';
+                    isEirpBased = true;
+                    powerEirpLimit = 36.0;  
+                    psdEirpLimit = 23.0;    
+
+                    powerConductedLimit = powerEirpLimit - dg;
+                    psdConductedLimit = psdEirpLimit - dg;
+
+                    document.getElementById('power_formula_math').innerText = "聯立式: $EIRP\\ Power (36) - DG$";
+                    document.getElementById('psd_formula_math').innerText = "聯立式: $EIRP\\ PSD (23) - DG$";
+                    document.getElementById('eirp_formula_math').innerText = "固定法規極限值: $36\\text{ dBm}$";
+                    document.getElementById('eirp_psd_formula_math').innerText = "固定法規極限值: $23\\text{ dBm/MHz}$";
+                    break;
+
+                case 'fcc_unii5_lpi': // FCC 15.407 U-NII-5~8 LPI Indoor AP (EIRP Base)
+                    psdUnit = 'dBm/MHz';
+                    isEirpBased = true;
+                    powerEirpLimit = 30.0;  
+                    psdEirpLimit = 5.0;     
+
+                    powerConductedLimit = powerEirpLimit - dg;
+                    psdConductedLimit = psdEirpLimit - dg;
+
+                    document.getElementById('power_formula_math').innerText = "聯立式: $EIRP\\ Power (30) - DG$";
+                    document.getElementById('psd_formula_math').innerText = "聯立式: $EIRP\\ PSD (5) - DG$";
+                    document.getElementById('eirp_formula_math').innerText = "固定法規極限值: $30\\text{ dBm}$";
+                    document.getElementById('eirp_psd_formula_math').innerText = "固定法規極限值: $5\\text{ dBm/MHz}$";
+                    break;
+            }
+
+            // 2. 將聯立換算結果渲染至右側 UI 介面
+            document.getElementById('conducted_power_limit_val').innerText = powerConductedLimit.toFixed(3);
+            document.getElementById('conducted_psd_limit_val').innerText = psdConductedLimit.toFixed(3);
+            document.getElementById('eirp_power_limit_val').innerText = powerEirpLimit.toFixed(3);
+            document.getElementById('eirp_psd_limit_val').innerText = psdEirpLimit.toFixed(3);
+
+            // 更新單位標記 (e.g., dBm/3kHz, dBm/MHz, dBm/500kHz)
+            document.getElementById('psd_unit_label').innerText = psdUnit;
+            document.getElementById('eirp_psd_unit_label').innerText = psdUnit;
+
+            // 即時啟動 LaTeX 公式排版
+            triggerMathJax();
+        }
+
+        // --- 6. SVG 拓撲圖繪製函數 ---
+
+        function drawRoutingTopology() {
+            const svg = document.getElementById('routing_svg');
+            svg.innerHTML = ''; 
+
+            const width = 500;
+            const height = 200;
+
+            svg.innerHTML += `
+                <defs>
+                    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#22d3ee" />
+                        <stop offset="100%" stop-color="#0891b2" />
+                    </linearGradient>
+                    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#34d399" />
+                        <stop offset="100%" stop-color="#059669" />
+                    </linearGradient>
+                </defs>
+            `;
+
+            const nSs = state.nSs;
+            const nAnt = state.nAnt;
+
+            const ssNodes = [];
+            const ssSpacing = height / (nSs + 1);
+            for (let j = 0; j < nSs; j++) {
+                ssNodes.push({
+                    x: 60,
+                    y: ssSpacing * (j + 1),
+                    label: `SS ${j+1}`
+                });
+            }
+
+            const antNodes = [];
+            const antSpacing = height / (nAnt + 1);
+            for (let k = 0; k < nAnt; k++) {
+                antNodes.push({
+                    x: width - 60,
+                    y: antSpacing * (k + 1),
+                    label: `Ant ${k+1}`
+                });
+            }
+
+            for (let j = 0; j < nSs; j++) {
+                for (let k = 0; k < nAnt; k++) {
+                    if (state.connections[j][k]) {
+                        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        const x1 = ssNodes[j].x;
+                        const y1 = ssNodes[j].y;
+                        const x2 = antNodes[k].x;
+                        const y2 = antNodes[k].y;
+                        
+                        const d = `M ${x1} ${y1} C ${(x1+x2)/2} ${y1}, ${(x1+x2)/2} ${y2}, ${x2} ${y2}`;
+                        path.setAttribute('d', d);
+                        
+                        const strokeColor = state.scenario === 'ii' ? '#06b6d4' : '#10b981';
+                        path.setAttribute('stroke', strokeColor);
+                        path.setAttribute('stroke-width', '2');
+                        path.setAttribute('fill', 'none');
+                        path.setAttribute('opacity', '0.7');
+                        
+                        path.setAttribute('stroke-dasharray', '6, 6');
+                        const anim = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+                        anim.setAttribute('attributeName', 'stroke-dashoffset');
+                        anim.setAttribute('values', '40;0');
+                        anim.setAttribute('dur', '2.5s');
+                        anim.setAttribute('repeatCount', 'indefinite');
+                        path.appendChild(anim);
+
+                        svg.appendChild(path);
+                    }
+                }
+            }
+
+            ssNodes.forEach((node) => {
+                const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', node.x - 35);
+                rect.setAttribute('y', node.y - 14);
+                rect.setAttribute('width', '70');
+                rect.setAttribute('height', '28');
+                rect.setAttribute('rx', '6');
+                rect.setAttribute('fill', '#0f172a');
+                rect.setAttribute('stroke', '#334155');
+                rect.setAttribute('stroke-width', '1.5');
+                group.appendChild(rect);
+
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', node.x);
+                text.setAttribute('y', node.y + 4);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('fill', '#e2e8f0');
+                text.setAttribute('font-size', '10');
+                text.setAttribute('font-weight', 'bold');
+                text.textContent = node.label;
+                group.appendChild(text);
+
+                svg.appendChild(group);
+            });
+
+            antNodes.forEach((node, idx) => {
+                const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', node.x - 35);
+                rect.setAttribute('y', node.y - 14);
+                rect.setAttribute('width', '70');
+                rect.setAttribute('height', '28');
+                rect.setAttribute('rx', '6');
+                
+                let strokeColor = '#06b6d4';
+                if (state.polarization === 'cross') {
+                    strokeColor = (idx % 2 === 0) ? '#a855f7' : '#e11d48'; 
+                }
+                rect.setAttribute('fill', '#0f172a');
+                rect.setAttribute('stroke', strokeColor);
+                rect.setAttribute('stroke-width', '1.5');
+                group.appendChild(rect);
+
+                const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                const py = node.y;
+                const px = node.x - 22;
+                poly.setAttribute('points', `${px},${py-5} ${px+6},${py-5} ${px+3},${py+2}`);
+                poly.setAttribute('fill', strokeColor);
+                group.appendChild(poly);
+
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', node.x + 8);
+                text.setAttribute('y', node.y + 4);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('fill', '#e2e8f0');
+                
+                let labelText = node.label;
+                if (state.polarization === 'cross') {
+                    labelText += (idx % 2 === 0) ? '(H)' : '(V)';
+                }
+                text.setAttribute('font-size', '8');
+                text.setAttribute('font-weight', 'bold');
+                text.textContent = labelText;
+                group.appendChild(text);
+
+                svg.appendChild(group);
+            });
+        }
+
+        // --- 7. 工具小函數 ---
+
+        function loadPreset(key) {
+            const config = PRESETS[key];
+            if (!config) return;
+
+            state.nAnt = config.nAnt;
+            state.nSs = config.nSs;
+            state.scenario = config.scenario;
+            state.polarization = config.polarization;
+            state.techMode = config.techMode;
+            state.cddSubMode = config.cddSubMode;
+            state.gains = [...config.gains];
+
+            state.connections = Array(8).fill(null).map(() => Array(8).fill(false));
+            state.powers = Array(8).fill(null).map(() => Array(8).fill(0.0));
+
+            for (let j = 0; j < config.nSs; j++) {
+                for (let k = 0; k < config.nAnt; k++) {
+                    state.connections[j][k] = config.connections[j][k];
+                    state.powers[j][k] = config.powers[j][k];
+                }
+            }
+
+            document.getElementById('nAnt').value = state.nAnt;
+            document.getElementById('nAnt_val').innerText = state.nAnt;
+            document.getElementById('nSs').value = state.nSs;
+            document.getElementById('nSs_val').innerText = state.nSs;
+            document.getElementById('polarization').value = state.polarization;
+            document.getElementById('tech_mode').value = state.techMode;
+            document.getElementById('cdd_sub_mode').value = state.cddSubMode;
+            
+            document.getElementById('nSs').max = 8;
+
+            const radio = document.querySelector(`input[name="scenario"][value="${state.scenario}"]`);
+            if (radio) radio.checked = true;
+
+            showToast("成功載入 KDB 官方相容預設檔！");
+            
+            updateTechConfig(); 
+        }
+
+        function showToast(message, type = "success") {
+            const container = document.getElementById('toast_container');
+            const toast = document.createElement('div');
+            toast.className = "flex items-center gap-2 bg-slate-900 border border-slate-800 text-slate-100 text-xs px-4 py-3 rounded-xl shadow-2xl pointer-events-auto transition-all duration-300 opacity-0 transform translate-y-2";
+            
+            const icon = type === 'success' 
+                ? '<span class="text-emerald-400">✓</span>' 
+                : '<span class="text-rose-400">✗</span>';
+
+            toast.innerHTML = `${icon} <span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-0', 'translate-y-2');
+                toast.classList.add('opacity-100', 'translate-y-0');
+            }, 50);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 3500);
+        }
+
+    </script>
+</body>
+</html>
